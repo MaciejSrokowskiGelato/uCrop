@@ -4,10 +4,13 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
+import android.os.Debug;
 import android.util.AttributeSet;
+import android.util.Log;
 
 import com.yalantis.ucrop.R;
 import com.yalantis.ucrop.callback.BitmapCropCallback;
@@ -41,6 +44,9 @@ public class CropImageView extends TransformImageView {
 
     private final RectF mCropRect = new RectF();
 
+    private PointF mInitialTranslation = new PointF(0.0f, 0.0f);
+    private float mInitialScale = 1.0f;
+    private float mInitialRotation = 90.0f;
     private final Matrix mTempMatrix = new Matrix();
 
     private float mTargetAspectRatio;
@@ -107,6 +113,29 @@ public class CropImageView extends TransformImageView {
      */
     public float getTargetAspectRatio() {
         return mTargetAspectRatio;
+    }
+
+    /**
+     * @param initialScale - initial scale to be applied to the image
+     */
+    public void setInitialScale(float initialScale) {
+        this.mInitialScale = initialScale;
+    }
+
+    /**
+     * @param initialTranslation - initial translation where the max value with either plus
+     *                          or minus sign is equal to half of total image dimension in
+     *                          given axis
+     */
+    public void setInitialTranslation(PointF initialTranslation) {
+        this.mInitialTranslation = initialTranslation;
+    }
+
+    /**
+     * @param initialRotation - initial rotation in degrees
+     */
+    public void setInitialRotation(float initialRotation) {
+        this.mInitialRotation = initialRotation;
     }
 
     /**
@@ -481,19 +510,28 @@ public class CropImageView extends TransformImageView {
     private void setupInitialImagePosition(float drawableWidth, float drawableHeight) {
         float cropRectWidth = mCropRect.width();
         float cropRectHeight = mCropRect.height();
+        float initialXTranslation = mInitialTranslation.x;
+        float initialYTranslation = mInitialTranslation.y;
 
-        float widthScale = mCropRect.width() / drawableWidth;
-        float heightScale = mCropRect.height() / drawableHeight;
+        float widthScale = cropRectWidth / drawableWidth;
+        float heightScale = cropRectHeight / drawableHeight;
 
-        float initialMinScale = Math.max(widthScale, heightScale);
+        float initialMinScale = Math.max(widthScale, heightScale) * mInitialScale;
 
-        float tw = (cropRectWidth - drawableWidth * initialMinScale) / 2.0f + mCropRect.left;
-        float th = (cropRectHeight - drawableHeight * initialMinScale) / 2.0f + mCropRect.top;
+        float tw = mCropRect.left
+                + (-drawableWidth * initialMinScale + cropRectWidth) / 2.0f
+                - initialXTranslation * initialMinScale
+                + cropRectWidth * initialXTranslation / drawableWidth;
+        float th = mCropRect.top
+                + (-drawableHeight * initialMinScale + cropRectHeight) / 2.0f
+                - initialYTranslation * initialMinScale
+                + cropRectHeight * initialYTranslation / drawableHeight;
 
         mCurrentImageMatrix.reset();
         mCurrentImageMatrix.postScale(initialMinScale, initialMinScale);
         mCurrentImageMatrix.postTranslate(tw, th);
         setImageMatrix(mCurrentImageMatrix);
+        postRotate(this.mInitialRotation);
     }
 
     /**
